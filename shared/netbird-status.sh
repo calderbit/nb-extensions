@@ -111,14 +111,15 @@ fi
 # ---------------------------------------------------------------------------
 # Build tooltip
 # ---------------------------------------------------------------------------
+NL=$'\n'
 TOOLTIP="NetBird VPN"
-TOOLTIP="${TOOLTIP}\nStatus: ${DAEMON_STATUS}"
-TOOLTIP="${TOOLTIP}\nIP: ${NETBIRD_IP}"
-TOOLTIP="${TOOLTIP}\nFQDN: ${FQDN}"
-TOOLTIP="${TOOLTIP}\nPeers: ${PEERS_CONNECTED}/${PEERS_TOTAL} connected"
-TOOLTIP="${TOOLTIP}\nRelays: ${RELAYS_AVAILABLE}/${RELAYS_TOTAL} available"
-TOOLTIP="${TOOLTIP}\nProfile: ${PROFILE}"
-TOOLTIP="${TOOLTIP}\nVersion: ${VERSION}"
+TOOLTIP="${TOOLTIP}${NL}Status: ${DAEMON_STATUS}"
+TOOLTIP="${TOOLTIP}${NL}IP: ${NETBIRD_IP}"
+TOOLTIP="${TOOLTIP}${NL}FQDN: ${FQDN}"
+TOOLTIP="${TOOLTIP}${NL}Peers: ${PEERS_CONNECTED}/${PEERS_TOTAL} connected"
+TOOLTIP="${TOOLTIP}${NL}Relays: ${RELAYS_AVAILABLE}/${RELAYS_TOTAL} available"
+TOOLTIP="${TOOLTIP}${NL}Profile: ${PROFILE}"
+TOOLTIP="${TOOLTIP}${NL}Version: ${VERSION}"
 
 # ---------------------------------------------------------------------------
 # Output
