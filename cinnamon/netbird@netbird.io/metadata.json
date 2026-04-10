@@ -1,0 +1,8 @@
+{
+  "uuid": "netbird@netbird.io",
+  "name": "NetBird VPN",
+  "description": "Control NetBird VPN from the Cinnamon panel",
+  "version": "1.0.0",
+  "max-instances": 1,
+  "icon": "network-vpn-symbolic"
+}

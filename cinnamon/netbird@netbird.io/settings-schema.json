@@ -1,0 +1,32 @@
+{
+  "layout": {
+    "type": "layout",
+    "pages": ["general"],
+    "general": {
+      "type": "page",
+      "title": "General",
+      "sections": ["settings"]
+    },
+    "settings": {
+      "type": "section",
+      "title": "Settings",
+      "keys": ["pollInterval", "showPeerCount"]
+    }
+  },
+  "pollInterval": {
+    "type": "spinbutton",
+    "default": 5,
+    "min": 1,
+    "max": 60,
+    "step": 1,
+    "units": "seconds",
+    "description": "Poll interval",
+    "tooltip": "How often to check NetBird status (in seconds)"
+  },
+  "showPeerCount": {
+    "type": "switch",
+    "default": true,
+    "description": "Show peer count",
+    "tooltip": "Display connected/total peer count on the panel"
+  }
+}

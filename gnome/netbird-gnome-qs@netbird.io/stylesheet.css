@@ -1,0 +1,22 @@
+/* NetBird Quick Settings */
+.netbird-toggle {
+    /* Base styles inherited from QuickMenuToggle */
+}
+
+.netbird-toggle.connected {
+    color: #a6e3a1;
+}
+
+.netbird-toggle.disconnected {
+    color: #6c7086;
+}
+
+.netbird-toggle.needslogin {
+    color: #fab387;
+}
+
+.netbird-status-label {
+    font-size: 0.9em;
+    color: #a6adc8;
+    padding: 2px 12px;
+}

@@ -1,0 +1,9 @@
+{
+  "uuid": "netbird-gnome-qs@netbird.io",
+  "name": "NetBird Quick Settings",
+  "description": "NetBird VPN toggle in GNOME Quick Settings panel",
+  "shell-version": ["45", "46", "47", "48"],
+  "version": 1,
+  "url": "https://github.com/netbirdio/netbird-desktop-extensions",
+  "settings-schema": "org.gnome.shell.extensions.netbird-qs"
+}
