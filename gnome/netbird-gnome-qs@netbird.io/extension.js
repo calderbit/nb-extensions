@@ -62,16 +62,14 @@ class NetBirdClient {
         await this._runCommand(['netbird', 'down']);
     }
 
+    /** Reconnect with a specific flag set to a value. */
+    async setFlag(flag, value) {
+        await this._runCommand(['netbird', 'up', `--${flag}=${value}`]);
+    }
+
     /**
      * Parse the text output of `netbird networks list` into an array of
      * {id, selected, name} objects.
-     *
-     * Expected format:
-     *   Available Networks:
-     *     - ID: route1
-     *       Network: 10.0.0.0/24
-     *       Domains: example.com    (optional — may be absent)
-     *       Status: Selected
      */
     async getNetworks() {
         let out;
@@ -97,10 +95,8 @@ class NetBirdClient {
                 };
             } else if (current) {
                 if (line.startsWith('Network:')) {
-                    // Use as fallback name; may be overridden by Domains.
                     current.name = line.replace('Network:', '').trim();
                 } else if (line.startsWith('Domains:')) {
-                    // Prefer Domains over Network for the display name.
                     const domains = line.replace('Domains:', '').trim();
                     if (domains) current.name = domains;
                 } else if (line.startsWith('Status:')) {
@@ -122,6 +118,50 @@ class NetBirdClient {
     /** Deselect a network by ID. */
     async deselectNetwork(id) {
         await this._runCommand(['netbird', 'networks', 'deselect', id]);
+    }
+
+    /**
+     * Parse `netbird profile list` into an array of {name, active} objects.
+     */
+    async getProfiles() {
+        let out;
+        try {
+            out = await this._runCommand(['netbird', 'profile', 'list']);
+        } catch (_e) {
+            return [];
+        }
+
+        const profiles = [];
+        for (const raw of out.split('\n')) {
+            const line = raw.trim();
+            if (!line || line.startsWith('Available') || line.startsWith('Profiles'))
+                continue;
+
+            const cleaned = line.replace(/^[-*]\s*/, '');
+            const active = cleaned.includes('(active)') || cleaned.includes('(selected)');
+            const name = cleaned
+                .replace(/\(active\)/g, '')
+                .replace(/\(selected\)/g, '')
+                .trim();
+            if (name) profiles.push({ name, active });
+        }
+        return profiles;
+    }
+
+    /** Switch to a different profile. */
+    async selectProfile(name) {
+        await this._runCommand(['netbird', 'profile', 'select', name]);
+    }
+
+    /** Deregister this peer from the management service. */
+    async deregister() {
+        try { await this._runCommand(['netbird', 'down']); } catch (_e) { /* ignore */ }
+        await this._runCommand(['netbird', 'deregister']);
+    }
+
+    /** Create a debug bundle and return the output. */
+    async createDebugBundle() {
+        return await this._runCommand(['netbird', 'debug', 'bundle']);
     }
 }
 
@@ -172,12 +212,74 @@ class NetBirdToggle extends QuickSettings.QuickMenuToggle {
         // ---- Separator -----------------------------------------------------
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // ---- Profile item (informational, insensitive) ---------------------
-        this._profileItem = new PopupMenu.PopupMenuItem('Profile: --', {
+        // ---- Settings section ----------------------------------------------
+        this._settingsHeader = new PopupMenu.PopupMenuItem('Settings', {
             reactive: false,
-            style_class: 'netbird-status-label',
+            style_class: 'netbird-section-header',
         });
-        this.menu.addMenuItem(this._profileItem);
+        this.menu.addMenuItem(this._settingsHeader);
+
+        this._sshToggle = new PopupMenu.PopupSwitchMenuItem('Allow SSH', false);
+        this._sshToggle.connect('toggled', (_item, state) => {
+            this._client.setFlag('allow-server-ssh', state).catch(e =>
+                console.error(`[NetBird] set SSH failed: ${e.message}`)
+            );
+        });
+        this.menu.addMenuItem(this._sshToggle);
+
+        this._quantumToggle = new PopupMenu.PopupSwitchMenuItem('Quantum Resistance', false);
+        this._quantumToggle.connect('toggled', (_item, state) => {
+            this._client.setFlag('enable-rosenpass', state).catch(e =>
+                console.error(`[NetBird] set quantum failed: ${e.message}`)
+            );
+        });
+        this.menu.addMenuItem(this._quantumToggle);
+
+        this._lazyToggle = new PopupMenu.PopupSwitchMenuItem('Lazy Connections', false);
+        this._lazyToggle.connect('toggled', (_item, state) => {
+            this._client.setFlag('enable-lazy-connection', state).catch(e =>
+                console.error(`[NetBird] set lazy failed: ${e.message}`)
+            );
+        });
+        this.menu.addMenuItem(this._lazyToggle);
+
+        // ---- Debug bundle --------------------------------------------------
+        this._debugBundleItem = new PopupMenu.PopupMenuItem('Create Debug Bundle');
+        this._debugBundleItem.connect('activate', () => {
+            this._client.createDebugBundle().then(out => {
+                Main.notify('NetBird', `Debug bundle created\n${out}`);
+            }).catch(e => {
+                Main.notify('NetBird', `Debug bundle failed: ${e.message}`);
+            });
+        });
+        this.menu.addMenuItem(this._debugBundleItem);
+
+        // ---- Separator -----------------------------------------------------
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // ---- Profiles section ----------------------------------------------
+        this._profilesHeader = new PopupMenu.PopupMenuItem('Profiles', {
+            reactive: false,
+            style_class: 'netbird-section-header',
+        });
+        this.menu.addMenuItem(this._profilesHeader);
+
+        this._profilesSection = new PopupMenu.PopupMenuSection();
+        this.menu.addMenuItem(this._profilesSection);
+
+        // ---- Deregister ----------------------------------------------------
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        this._deregisterItem = new PopupMenu.PopupMenuItem('Deregister');
+        this._deregisterItem.add_style_class_name('netbird-destructive');
+        this._deregisterItem.connect('activate', () => {
+            this._client.deregister().then(() => {
+                Main.notify('NetBird', 'Peer deregistered');
+            }).catch(e => {
+                Main.notify('NetBird', `Deregister failed: ${e.message}`);
+            });
+        });
+        this.menu.addMenuItem(this._deregisterItem);
 
         // ---- Toggle handler ------------------------------------------------
         this.connect('clicked', () => {
@@ -202,7 +304,9 @@ class NetBirdToggle extends QuickSettings.QuickMenuToggle {
             this._ipLabel.label.text = 'IP: --';
             this._fqdnLabel.label.text = 'FQDN: --';
             this._peersLabel.label.text = 'Peers: --';
-            this._profileItem.label.text = 'Profile: --';
+            this._sshToggle.setToggleState(false);
+            this._quantumToggle.setToggleState(false);
+            this._lazyToggle.setToggleState(false);
             this._setStateClass('disconnected');
             return;
         }
@@ -238,8 +342,18 @@ class NetBirdToggle extends QuickSettings.QuickMenuToggle {
         this._peersLabel.label.text =
             `Peers: ${peers.connected ?? 0} / ${peers.total ?? 0} connected`;
 
-        this._profileItem.label.text =
-            `Profile: ${status.profileName ?? '--'}`;
+        // Settings toggles (update without re-triggering the toggled signal)
+        const ssh = status.sshServer?.enabled ?? false;
+        if (this._sshToggle.state !== ssh)
+            this._sshToggle.setToggleState(ssh);
+
+        const quantum = status.quantumResistance ?? false;
+        if (this._quantumToggle.state !== quantum)
+            this._quantumToggle.setToggleState(quantum);
+
+        const lazy = status.lazyConnectionEnabled ?? false;
+        if (this._lazyToggle.state !== lazy)
+            this._lazyToggle.setToggleState(lazy);
 
         // CSS state class
         if (daemon === 'Connected') {
@@ -279,6 +393,41 @@ class NetBirdToggle extends QuickSettings.QuickMenuToggle {
                 }
             });
             this._networksSection.addMenuItem(item);
+        }
+    }
+
+    _updateProfiles(profiles, currentProfile) {
+        this._profilesSection.removeAll();
+
+        if (!profiles || profiles.length === 0) {
+            const item = new PopupMenu.PopupMenuItem(
+                `Profile: ${currentProfile ?? '--'}`,
+                { reactive: false }
+            );
+            this._profilesSection.addMenuItem(item);
+            return;
+        }
+
+        for (const prof of profiles) {
+            const isActive = prof.active || prof.name === currentProfile;
+            const label = isActive ? `● ${prof.name}` : `  ${prof.name}`;
+            const item = new PopupMenu.PopupMenuItem(label);
+            if (isActive) {
+                item.setSensitive(false);
+            } else {
+                item.connect('activate', () => {
+                    this._client.disconnect().then(() =>
+                        this._client.selectProfile(prof.name)
+                    ).then(() =>
+                        this._client.connect()
+                    ).then(() => {
+                        Main.notify('NetBird', `Switched to profile: ${prof.name}`);
+                    }).catch(e => {
+                        console.error(`[NetBird] switch profile failed: ${e.message}`);
+                    });
+                });
+            }
+            this._profilesSection.addMenuItem(item);
         }
     }
 });
@@ -340,6 +489,14 @@ class NetBirdIndicator extends QuickSettings.SystemIndicator {
             this._toggle._updateNetworks(networks);
         } catch (e) {
             console.error(`[NetBird] _updateNetworks error: ${e.message}`);
+        }
+
+        // Refresh profiles list
+        try {
+            const profiles = await this._client.getProfiles();
+            this._toggle._updateProfiles(profiles, status?.profileName);
+        } catch (e) {
+            console.error(`[NetBird] _updateProfiles error: ${e.message}`);
         }
     }
 

@@ -16,6 +16,7 @@
     "tooltip": "NetBird: {status}\nIP: {ip}\nPeers: {peers.connected} of {peers.total} connected",
     "on-click": "~/.config/netbird-widget/netbird-toggle.sh",
     "on-click-right": "~/.config/netbird-widget/netbird-networks.sh",
+    "on-click-middle": "~/.config/netbird-widget/netbird-settings.sh",
     "class": "cmodule-netbird"
   }
 }

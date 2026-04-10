@@ -10,6 +10,7 @@
         "interval": 5,
         "on-click": "~/.config/netbird-widget/netbird-toggle.sh",
         "on-click-right": "~/.config/netbird-widget/netbird-networks.sh",
+        "on-click-middle": "~/.config/netbird-widget/netbird-settings.sh",
         "format": "{icon} {text}",
         "format-icons": {
             "connected": "󰌘",

@@ -22,6 +22,7 @@ NetBirdApplet.prototype = {
         this._metadata = metadata;
         this._timerId = null;
         this._connected = false;
+        this._suppressSettingsToggle = false;
 
         // Icon and tooltip
         this.set_applet_icon_symbolic_name("network-vpn-symbolic");
@@ -88,9 +89,53 @@ NetBirdApplet.prototype = {
         // Separator
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Profile
-        this._profileItem = new PopupMenu.PopupMenuItem("Profile: --", { reactive: false });
-        this.menu.addMenuItem(this._profileItem);
+        // ---- Settings section ----------------------------------------------
+        this._settingsLabel = new PopupMenu.PopupMenuItem("Settings", { reactive: false });
+        this.menu.addMenuItem(this._settingsLabel);
+
+        this._sshToggle = new PopupMenu.PopupSwitchMenuItem("Allow SSH", false);
+        this._sshToggle.connect("toggled", Lang.bind(this, function(_item, state) {
+            if (this._suppressSettingsToggle) return;
+            this._setFlag("allow-server-ssh", state);
+        }));
+        this.menu.addMenuItem(this._sshToggle);
+
+        this._quantumToggle = new PopupMenu.PopupSwitchMenuItem("Quantum Resistance", false);
+        this._quantumToggle.connect("toggled", Lang.bind(this, function(_item, state) {
+            if (this._suppressSettingsToggle) return;
+            this._setFlag("enable-rosenpass", state);
+        }));
+        this.menu.addMenuItem(this._quantumToggle);
+
+        this._lazyToggle = new PopupMenu.PopupSwitchMenuItem("Lazy Connections", false);
+        this._lazyToggle.connect("toggled", Lang.bind(this, function(_item, state) {
+            if (this._suppressSettingsToggle) return;
+            this._setFlag("enable-lazy-connection", state);
+        }));
+        this.menu.addMenuItem(this._lazyToggle);
+
+        // Debug bundle
+        this._debugBundleItem = new PopupMenu.PopupMenuItem("Create Debug Bundle");
+        this._debugBundleItem.connect("activate", Lang.bind(this, this._createDebugBundle));
+        this.menu.addMenuItem(this._debugBundleItem);
+
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // ---- Profiles section ----------------------------------------------
+        this._profilesLabel = new PopupMenu.PopupMenuItem("Profiles", { reactive: false });
+        this.menu.addMenuItem(this._profilesLabel);
+
+        this._profilesSection = new PopupMenu.PopupMenuSection();
+        this.menu.addMenuItem(this._profilesSection);
+
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Deregister
+        this._deregisterItem = new PopupMenu.PopupMenuItem("Deregister");
+        this._deregisterItem.connect("activate", Lang.bind(this, this._deregister));
+        this.menu.addMenuItem(this._deregisterItem);
     },
 
     // ---------------------------------------------------------------
@@ -147,8 +192,9 @@ NetBirdApplet.prototype = {
             }
         }));
 
-        // Also fetch networks
+        // Also fetch networks and profiles
         this._getNetworks();
+        this._getProfiles();
     },
 
     _connect: function() {
@@ -157,7 +203,6 @@ NetBirdApplet.prototype = {
 
         this._runCommandAsync([NETBIRD_BIN, "up"], Lang.bind(this, function(stdout, stderr, exitStatus) {
             this._toggleItem.setSensitive(true);
-            // Refresh status after connect attempt
             this._getStatus();
         }));
     },
@@ -168,7 +213,12 @@ NetBirdApplet.prototype = {
 
         this._runCommandAsync([NETBIRD_BIN, "down"], Lang.bind(this, function(stdout, stderr, exitStatus) {
             this._toggleItem.setSensitive(true);
-            // Refresh status after disconnect attempt
+            this._getStatus();
+        }));
+    },
+
+    _setFlag: function(flag, value) {
+        this._runCommandAsync([NETBIRD_BIN, "up", "--" + flag + "=" + value], Lang.bind(this, function(stdout, stderr, exitStatus) {
             this._getStatus();
         }));
     },
@@ -188,6 +238,44 @@ NetBirdApplet.prototype = {
     _deselectNetwork: function(id) {
         this._runCommandAsync([NETBIRD_BIN, "networks", "deselect", id], Lang.bind(this, function(stdout, stderr, exitStatus) {
             this._getNetworks();
+        }));
+    },
+
+    _getProfiles: function() {
+        this._runCommandAsync([NETBIRD_BIN, "profile", "list"], Lang.bind(this, function(stdout, stderr, exitStatus) {
+            this._updateProfiles(stdout, exitStatus);
+        }));
+    },
+
+    _selectProfile: function(name) {
+        // Disconnect, switch profile, reconnect
+        this._runCommandAsync([NETBIRD_BIN, "down"], Lang.bind(this, function() {
+            this._runCommandAsync([NETBIRD_BIN, "profile", "select", name], Lang.bind(this, function() {
+                this._runCommandAsync([NETBIRD_BIN, "up"], Lang.bind(this, function() {
+                    this._getStatus();
+                }));
+            }));
+        }));
+    },
+
+    _createDebugBundle: function() {
+        this._runCommandAsync([NETBIRD_BIN, "debug", "bundle"], Lang.bind(this, function(stdout, stderr, exitStatus) {
+            if (exitStatus === 0) {
+                global.log("NetBird: Debug bundle created");
+            } else {
+                global.logError("NetBird: Debug bundle failed: " + (stderr || "unknown error"));
+            }
+        }));
+    },
+
+    _deregister: function() {
+        this._runCommandAsync([NETBIRD_BIN, "down"], Lang.bind(this, function() {
+            this._runCommandAsync([NETBIRD_BIN, "deregister"], Lang.bind(this, function(stdout, stderr, exitStatus) {
+                if (exitStatus === 0) {
+                    global.log("NetBird: Peer deregistered");
+                }
+                this._getStatus();
+            }));
         }));
     },
 
@@ -227,9 +315,20 @@ NetBirdApplet.prototype = {
         let relaysTotal = (relays.total !== undefined) ? relays.total : 0;
         this._relaysItem.label.set_text("Relays: " + relaysAvailable + "/" + relaysTotal);
 
-        // Profile
-        let profile = status.profileName || "--";
-        this._profileItem.label.set_text("Profile: " + profile);
+        // Settings toggles (suppress signal to avoid triggering setFlag)
+        this._suppressSettingsToggle = true;
+        try {
+            let sshEnabled = (status.sshServer && status.sshServer.enabled) || false;
+            this._sshToggle.setToggleState(sshEnabled);
+
+            let quantum = status.quantumResistance || false;
+            this._quantumToggle.setToggleState(quantum);
+
+            let lazy = status.lazyConnectionEnabled || false;
+            this._lazyToggle.setToggleState(lazy);
+        } finally {
+            this._suppressSettingsToggle = false;
+        }
 
         // Applet label (peer count on panel)
         if (isConnected && this.showPeerCount) {
@@ -277,10 +376,18 @@ NetBirdApplet.prototype = {
         this._fqdnItem.label.set_text(reason || "Disconnected");
         this._peersItem.label.set_text("Peers: --");
         this._relaysItem.label.set_text("Relays: --");
-        this._profileItem.label.set_text("Profile: --");
         this.set_applet_label("");
         this.set_applet_tooltip("NetBird VPN - " + (reason || "Disconnected"));
         this.set_applet_icon_symbolic_name("network-vpn-disabled-symbolic");
+
+        this._suppressSettingsToggle = true;
+        try {
+            this._sshToggle.setToggleState(false);
+            this._quantumToggle.setToggleState(false);
+            this._lazyToggle.setToggleState(false);
+        } finally {
+            this._suppressSettingsToggle = false;
+        }
     },
 
     _updateNetworks: function(stdout, exitStatus) {
@@ -293,12 +400,6 @@ NetBirdApplet.prototype = {
             return;
         }
 
-        // Parse the text output of `netbird networks list`
-        // Format:
-        //   Available Networks:
-        //     - ID: route1
-        //       Network: 10.0.0.0/24
-        //       Status: Selected
         let lines = stdout.split("\n");
         let networks = [];
         let current = null;
@@ -337,7 +438,6 @@ NetBirdApplet.prototype = {
             let label = net.network + " (" + net.id + ")";
             let item = new PopupMenu.PopupSwitchMenuItem(label, net.selected);
 
-            // Use a closure to capture the network id and selected state
             (function(applet, networkId, isSelected) {
                 item.connect("toggled", Lang.bind(applet, function() {
                     if (isSelected) {
@@ -349,6 +449,58 @@ NetBirdApplet.prototype = {
             })(this, net.id, net.selected);
 
             this._networksSection.addMenuItem(item);
+        }
+    },
+
+    _updateProfiles: function(stdout, exitStatus) {
+        this._profilesSection.removeAll();
+
+        if (exitStatus !== 0 || !stdout) {
+            let item = new PopupMenu.PopupMenuItem("No profiles", { reactive: false });
+            this._profilesSection.addMenuItem(item);
+            return;
+        }
+
+        let lines = stdout.split("\n");
+        let profiles = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line || line.indexOf("Available") === 0 || line.indexOf("Profiles") === 0)
+                continue;
+
+            // Strip leading bullet/dash
+            line = line.replace(/^[-*]\s*/, "");
+
+            let active = (line.indexOf("(active)") !== -1 || line.indexOf("(selected)") !== -1);
+            let name = line.replace(/\(active\)/g, "").replace(/\(selected\)/g, "").trim();
+            if (name) {
+                profiles.push({ name: name, active: active });
+            }
+        }
+
+        if (profiles.length === 0) {
+            let item = new PopupMenu.PopupMenuItem("No profiles", { reactive: false });
+            this._profilesSection.addMenuItem(item);
+            return;
+        }
+
+        for (let i = 0; i < profiles.length; i++) {
+            let prof = profiles[i];
+            let label = prof.active ? "\u25CF " + prof.name : "  " + prof.name;
+            let item = new PopupMenu.PopupMenuItem(label);
+
+            if (prof.active) {
+                item.setSensitive(false);
+            } else {
+                (function(applet, profileName) {
+                    item.connect("activate", Lang.bind(applet, function() {
+                        applet._selectProfile(profileName);
+                    }));
+                })(this, prof.name);
+            }
+
+            this._profilesSection.addMenuItem(item);
         }
     },
 
@@ -370,7 +522,6 @@ NetBirdApplet.prototype = {
     },
 
     _onShowPeerCountChanged: function() {
-        // Re-run status to update the label immediately
         this._getStatus();
     },
 
@@ -386,7 +537,7 @@ NetBirdApplet.prototype = {
         this._stopPolling();
         this._timerId = Mainloop.timeout_add_seconds(this.pollInterval, Lang.bind(this, function() {
             this._getStatus();
-            return true; // Keep the timer running
+            return true;
         }));
     },
 
