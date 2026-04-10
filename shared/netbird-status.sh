@@ -15,14 +15,18 @@ FORMAT="${1:-waybar}"
 # Error fallback -- emits a safe JSON blob every consumer can handle
 # ---------------------------------------------------------------------------
 error_json() {
-    jq -n \
-        --arg text "N/A" \
-        --arg tooltip "NetBird: Error" \
-        --arg class "error" \
-        --arg alt "error" \
-        --argjson percentage 0 \
-        '{text: $text, tooltip: $tooltip, class: $class, alt: $alt, percentage: $percentage}'
-    exit 1
+    if command -v jq &>/dev/null; then
+        jq -cn \
+            --arg text "N/A" \
+            --arg tooltip "NetBird: Error" \
+            --arg class "error" \
+            --arg alt "error" \
+            --argjson percentage 0 \
+            '{text: $text, tooltip: $tooltip, class: $class, alt: $alt, percentage: $percentage}'
+    else
+        echo '{"text":"N/A","tooltip":"NetBird: Error","class":"error","alt":"error","percentage":0}'
+    fi
+    exit 0
 }
 
 # ---------------------------------------------------------------------------
@@ -121,7 +125,7 @@ TOOLTIP="${TOOLTIP}\nVersion: ${VERSION}"
 # ---------------------------------------------------------------------------
 case "$FORMAT" in
     hyprpanel)
-        jq -n \
+        jq -cn \
             --arg alt "$ALT" \
             --argjson percentage "$PERCENTAGE" \
             --arg status "$DAEMON_STATUS" \
@@ -137,7 +141,7 @@ case "$FORMAT" in
             }'
         ;;
     waybar|*)
-        jq -n \
+        jq -cn \
             --arg text "$TEXT" \
             --arg tooltip "$TOOLTIP" \
             --arg class "$CLASS" \
