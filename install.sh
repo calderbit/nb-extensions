@@ -112,7 +112,7 @@ install_shared() {
 
     mkdir -p "$INSTALL_DIR"
 
-    local scripts=(netbird-status.sh netbird-toggle.sh netbird-networks.sh)
+    local scripts=(netbird-status.sh netbird-toggle.sh netbird-networks.sh netbird-settings.sh netbird-profiles.sh)
     for s in "${scripts[@]}"; do
         local src="$SCRIPT_DIR/shared/$s"
         if [ ! -f "$src" ]; then
