@@ -1,0 +1,7 @@
+*.zip
+build/
+node_modules/
+.cache/
+*.swp
+*~
+.DS_Store
