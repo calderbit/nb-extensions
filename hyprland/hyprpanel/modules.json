@@ -1,0 +1,21 @@
+{
+  "bar.customModules.netbird": {
+    "exec": "~/.config/netbird-widget/netbird-status.sh hyprpanel",
+    "return-type": "json",
+    "interval": 5,
+    "format": {
+      "icons": {
+        "connected": "\udb80\udf18",
+        "disconnected": "\udb80\udf19",
+        "needslogin": "\udb80\udf1a",
+        "connecting": "\udb80\udf1a",
+        "error": "\udb80\udf1a"
+      }
+    },
+    "label": "{icon} {peers.connected}/{peers.total}",
+    "tooltip": "NetBird: {status}\nIP: {ip}\nPeers: {peers.connected} of {peers.total} connected",
+    "on-click": "~/.config/netbird-widget/netbird-toggle.sh",
+    "on-click-right": "~/.config/netbird-widget/netbird-networks.sh",
+    "class": "cmodule-netbird"
+  }
+}

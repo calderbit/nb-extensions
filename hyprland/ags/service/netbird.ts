@@ -1,0 +1,177 @@
+// NetBird VPN service for AGS v2 (Astal)
+//
+// Provides reactive state variables and action functions for the NetBird
+// bar widget and popup. Polls `netbird status --json` every 5 seconds.
+
+import { Variable, bind } from "astal";
+import { execAsync } from "astal/process";
+
+// ---------------------------------------------------------------------------
+// Interfaces
+// ---------------------------------------------------------------------------
+
+export interface PeerDetail {
+    fqdn: string;
+    netbirdIp: string;
+    status: string;
+    connectionType: string;
+    latency: number;
+}
+
+export interface NetBirdStatus {
+    peers: {
+        total: number;
+        connected: number;
+        details: PeerDetail[];
+    };
+    daemonStatus: string;
+    relays: {
+        total: number;
+        available: number;
+    };
+    netbirdIp: string;
+    fqdn: string;
+    networks: string[];
+    profileName: string;
+    daemonVersion: string;
+}
+
+// ---------------------------------------------------------------------------
+// Reactive state
+// ---------------------------------------------------------------------------
+
+/** Polled NetBird status (null when the daemon is unreachable). */
+export const netbirdStatus = Variable<NetBirdStatus | null>(null).poll(
+    5000,
+    ["netbird", "status", "--json"],
+    (out: string) => {
+        try {
+            return JSON.parse(out) as NetBirdStatus;
+        } catch {
+            return null;
+        }
+    },
+);
+
+// ---------------------------------------------------------------------------
+// Derived variables
+// ---------------------------------------------------------------------------
+
+/** Whether the daemon reports "Connected". */
+export const isConnected = Variable.derive(
+    [bind(netbirdStatus)],
+    (s: NetBirdStatus | null) => s?.daemonStatus === "Connected",
+);
+
+/** CSS-friendly state class name. */
+export const stateClass = Variable.derive(
+    [bind(netbirdStatus)],
+    (s: NetBirdStatus | null): string => {
+        if (!s) return "error";
+        switch (s.daemonStatus) {
+            case "Connected":
+                return "connected";
+            case "NeedsLogin":
+            case "LoginFailed":
+            case "SessionExpired":
+                return "needslogin";
+            case "Connecting":
+                return "connecting";
+            default:
+                return "disconnected";
+        }
+    },
+);
+
+/** Short text label for the bar: "2/3", "Off", or "Login". */
+export const peerCount = Variable.derive(
+    [bind(netbirdStatus)],
+    (s: NetBirdStatus | null): string => {
+        if (!s) return "Off";
+        switch (s.daemonStatus) {
+            case "Connected":
+                return `${s.peers.connected}/${s.peers.total}`;
+            case "NeedsLogin":
+            case "LoginFailed":
+            case "SessionExpired":
+                return "Login";
+            default:
+                return "Off";
+        }
+    },
+);
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+
+/** Toggle: disconnect if connected, connect otherwise. */
+export async function toggle(): Promise<void> {
+    const s = netbirdStatus.get();
+    if (s?.daemonStatus === "Connected") {
+        await execAsync(["netbird", "down"]);
+    } else {
+        await execAsync(["netbird", "up"]);
+    }
+}
+
+/** Explicitly bring the tunnel up. */
+export async function connect(): Promise<void> {
+    await execAsync(["netbird", "up"]);
+}
+
+/** Explicitly bring the tunnel down. */
+export async function disconnect(): Promise<void> {
+    await execAsync(["netbird", "down"]);
+}
+
+/**
+ * Parse `netbird networks list` text output into a structured array.
+ *
+ * Expected format:
+ *   - ID: <id>
+ *     Network: ... / Domains: ...
+ *     Status: Selected | Not Selected
+ */
+export interface NetworkEntry {
+    id: string;
+    selected: boolean;
+    name: string;
+}
+
+export async function getNetworks(): Promise<NetworkEntry[]> {
+    const raw = await execAsync(["netbird", "networks", "list"]);
+    const entries: NetworkEntry[] = [];
+    let currentId = "";
+
+    for (const line of raw.split("\n")) {
+        const idMatch = line.match(/^\s*-\s*ID:\s*(.+)$/);
+        if (idMatch) {
+            currentId = idMatch[1].trim();
+        }
+
+        if (currentId) {
+            const statusMatch = line.match(/^\s*Status:\s*(.+)$/);
+            if (statusMatch) {
+                entries.push({
+                    id: currentId,
+                    selected: statusMatch[1].trim() === "Selected",
+                    name: currentId,
+                });
+                currentId = "";
+            }
+        }
+    }
+
+    return entries;
+}
+
+/** Select a network by ID. */
+export async function selectNetwork(id: string): Promise<void> {
+    await execAsync(["netbird", "networks", "select", "-a", id]);
+}
+
+/** Deselect a network by ID. */
+export async function deselectNetwork(id: string): Promise<void> {
+    await execAsync(["netbird", "networks", "deselect", id]);
+}

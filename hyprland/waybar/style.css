@@ -1,0 +1,36 @@
+/* NetBird VPN module styles for Waybar
+ * Catppuccin-inspired palette
+ *
+ * Add to ~/.config/waybar/style.css via @import or copy directly:
+ *   @import url("path/to/this/style.css");
+ */
+
+#custom-netbird {
+    font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font", monospace;
+    font-size: 14px;
+    color: #cdd6f4;
+    padding: 0 8px;
+    margin: 0 2px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+#custom-netbird.connected {
+    color: #a6e3a1;
+}
+
+#custom-netbird.disconnected {
+    color: #6c7086;
+}
+
+#custom-netbird.needslogin {
+    color: #fab387;
+}
+
+#custom-netbird.connecting {
+    color: #89b4fa;
+}
+
+#custom-netbird.error {
+    color: #f38ba8;
+}

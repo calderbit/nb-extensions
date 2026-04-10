@@ -1,0 +1,23 @@
+// NetBird VPN module for Waybar
+// Merge this into your ~/.config/waybar/config.jsonc
+//
+// Add "custom/netbird" to your "modules-right" (or left/center) array.
+
+{
+    "custom/netbird": {
+        "exec": "~/.config/netbird-widget/netbird-status.sh",
+        "return-type": "json",
+        "interval": 5,
+        "on-click": "~/.config/netbird-widget/netbird-toggle.sh",
+        "on-click-right": "~/.config/netbird-widget/netbird-networks.sh",
+        "format": "{icon} {}",
+        "format-icons": {
+            "connected": "󰌘",
+            "disconnected": "󰌙",
+            "needslogin": "󰌚",
+            "connecting": "󰌚",
+            "error": "󰌚"
+        },
+        "tooltip": true
+    }
+}

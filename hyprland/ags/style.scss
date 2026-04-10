@@ -1,0 +1,106 @@
+// NetBird AGS widget styles
+// Catppuccin Mocha palette, matching the Waybar / HyprPanel modules.
+
+// -- Catppuccin Mocha tokens --
+$green:    #a6e3a1;  // connected
+$peach:    #fab387;  // needs login
+$blue:     #89b4fa;  // connecting
+$overlay0: #6c7086;  // disconnected
+$red:      #f38ba8;  // error
+$surface0: #313244;
+$base:     #1e1e2e;
+$text:     #cdd6f4;
+$subtext0: #a6adc8;
+
+// ---------------------------------------------------------------------------
+// Bar button
+// ---------------------------------------------------------------------------
+
+.netbird-button {
+  padding: 0 8px;
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 13px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+
+  label {
+    margin: 0 4px;
+  }
+
+  &.connected {
+    color: $green;
+  }
+
+  &.disconnected {
+    color: $overlay0;
+    opacity: 0.7;
+  }
+
+  &.needslogin {
+    color: $peach;
+  }
+
+  &.connecting {
+    color: $blue;
+    animation: netbird-pulse 1.5s ease-in-out infinite;
+  }
+
+  &.error {
+    color: $red;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Popup / expanded panel
+// ---------------------------------------------------------------------------
+
+.netbird-popup {
+  background: $base;
+  border: 1px solid $surface0;
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 240px;
+
+  .netbird-header {
+    padding-bottom: 8px;
+    border-bottom: 1px solid $surface0;
+    margin-bottom: 8px;
+
+    icon {
+      font-size: 18px;
+      margin-right: 8px;
+      color: $blue;
+    }
+
+    .netbird-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: $text;
+    }
+
+    switch {
+      margin-left: auto;
+    }
+  }
+
+  .netbird-details {
+    label {
+      font-size: 12px;
+      color: $subtext0;
+      padding: 2px 0;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared animation
+// ---------------------------------------------------------------------------
+
+@keyframes netbird-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
